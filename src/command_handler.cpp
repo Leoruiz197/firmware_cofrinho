@@ -7,6 +7,8 @@
 #include "state.h"
 
 namespace {
+bool internalLightEnabled = false;
+
 RgbColor readColor(JsonVariantConst value, RgbColor fallback) {
   if (!value.is<JsonObjectConst>()) {
     return fallback;
@@ -40,11 +42,19 @@ void handleCommand(const String& payload) {
     action.toLowerCase();
     if (action == "abrir") openDoor();
     else if (action == "fechar") closeDoor();
-    else if (action == "luz") turnInternalLightOn();
-    else if (action == "apagar") turnAllLedsOff();
+    else if (action == "luz") {
+      internalLightEnabled = !internalLightEnabled;
+      if (internalLightEnabled) turnInternalLightOn();
+      else turnInternalLightOff();
+    }
+    else if (action == "apagar") {
+      internalLightEnabled = false;
+      turnAllLedsOff();
+    }
     else if (action == "tranca_direita") openLock();
     else if (action == "tranca_esquerda") closeLock();
     else if (action == "correta") showCorrectAttempt(readColor(document["cor"], deviceConfig.teamColor));
+    else if (action == "erro") showIncorrectAttempt();
     else {
       Serial.printf("[WS] Erro ao processar comando: comando desconhecido (%s).\n", action.c_str());
       publishStatus("command", "error", "unknown_command");

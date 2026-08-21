@@ -76,6 +76,16 @@ void handleWebSocketMessage(const String& message) {
 
     JsonDocument configurationDocument;
     configurationDocument["num_senhas"] = config["stages"];
+    if (config["doorCloseAngle"].is<int>()) {
+      configurationDocument["angulo-max"] = config["doorCloseAngle"];
+    }
+    if (config["teamColor"].is<JsonObjectConst>()) {
+      JsonObject color = configurationDocument["cor_equipe"]["cor"].to<JsonObject>();
+      JsonObjectConst teamColor = config["teamColor"].as<JsonObjectConst>();
+      color["R"] = teamColor["R"] | 255;
+      color["G"] = teamColor["G"] | 255;
+      color["B"] = teamColor["B"] | 255;
+    }
     String configurationPayload;
     serializeJson(configurationDocument, configurationPayload);
     handleConfiguration(configurationPayload);
