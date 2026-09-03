@@ -20,7 +20,7 @@ constexpr int LOCK_CLOSED_ANGLE = 90;
 constexpr uint8_t MAX_STAGES = PROGRESS_LED_END - PROGRESS_LED_START + 1;
 
 constexpr unsigned long WEBSOCKET_RECONNECT_INTERVAL_MS = 5000;
-constexpr uint16_t BACKEND_PORT = 3000;
+constexpr uint16_t DEFAULT_BACKEND_PORT = 3000;
 constexpr char DEFAULT_BACKEND_HOST[] = "";
 constexpr char DEFAULT_DEVICE_TOKEN[] = "cofrinho-device-token";
 constexpr char DEFAULT_DEVICE_ID[] = "cofre01";

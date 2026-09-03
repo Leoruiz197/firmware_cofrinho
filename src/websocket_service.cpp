@@ -49,7 +49,7 @@ void handleWebSocketMessage(const String& message) {
 
   const char* type = document["type"] | "";
   if (strcmp(type, "command") == 0) {
-    if (!document["command"].is<const char*>() || !document["payload"].is<JsonObjectConst>()) {
+    if (document["command"].isNull() || !document["payload"].is<JsonObjectConst>()) {
       Serial.println("[WS] Erro ao processar comando: envelope invalido.");
       publishStatus("command", "error", "invalid_envelope");
       return;
@@ -59,7 +59,7 @@ void handleWebSocketMessage(const String& message) {
     for (JsonPairConst field : document["payload"].as<JsonObjectConst>()) {
       commandDocument[field.key()] = field.value();
     }
-    commandDocument["comando"] = document["command"];
+    commandDocument["comando"].set(document["command"]);
     String commandPayload;
     serializeJson(commandDocument, commandPayload);
     handleCommand(commandPayload);
@@ -76,6 +76,9 @@ void handleWebSocketMessage(const String& message) {
 
     JsonDocument configurationDocument;
     configurationDocument["num_senhas"] = config["stages"];
+    if (config["doorOpenAngle"].is<int>()) {
+      configurationDocument["angulo-min"] = config["doorOpenAngle"];
+    }
     if (config["doorCloseAngle"].is<int>()) {
       configurationDocument["angulo-max"] = config["doorCloseAngle"];
     }
@@ -103,7 +106,7 @@ void handleWebSocketMessage(const String& message) {
 void onWebSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
-      Serial.printf("[WS] Conectado a ws://%s:%u/ws/cofres\n", deviceConfig.backendHost, BACKEND_PORT);
+      Serial.printf("[WS] Conectado a ws://%s:%u/ws/cofres\n", deviceConfig.backendHost, deviceConfig.backendPort);
       publishStatus("connection", "connected");
       break;
     case WStype_DISCONNECTED:
@@ -150,8 +153,8 @@ void initializeWebSocket() {
 
   const String path = "/ws/cofres?deviceId=" + urlEncode(deviceConfig.deviceId) +
       "&token=" + urlEncode(deviceConfig.deviceToken);
-  Serial.printf("[WS] Conectando a ws://%s:%u%s\n", deviceConfig.backendHost, BACKEND_PORT, path.c_str());
-  webSocket.begin(deviceConfig.backendHost, BACKEND_PORT, path.c_str());
+  Serial.printf("[WS] Conectando a ws://%s:%u%s\n", deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
+  webSocket.begin(deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
   webSocket.onEvent(onWebSocketEvent);
   webSocket.setReconnectInterval(WEBSOCKET_RECONNECT_INTERVAL_MS);
 }

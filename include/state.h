@@ -11,8 +11,10 @@ struct RgbColor {
 
 struct DeviceConfig {
   char backendHost[64];
+  uint16_t backendPort;
   char deviceToken[96];
   char deviceId[32];
+  int doorOpenAngle;
   int doorCloseAngle;
   uint8_t passwordCount;
   RgbColor teamColor;

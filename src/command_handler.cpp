@@ -89,6 +89,10 @@ void handleConfiguration(const String& payload) {
   }
 
   bool changed = false;
+  if (!document["angulo-min"].isNull()) {
+    deviceConfig.doorOpenAngle = constrain(document["angulo-min"].as<int>(), 0, 180);
+    changed = true;
+  }
   if (!document["angulo-max"].isNull()) {
     deviceConfig.doorCloseAngle = constrain(document["angulo-max"].as<int>(), 0, 180);
     changed = true;
