@@ -1,88 +1,89 @@
-# Firmware Cofrinho
+# Firmware Cofrinho (ESP32)
 
-Firmware para ESP32 do cofrinho, baseado no comportamento do Cofre FIAP V2,
-comunicando-se com o backend por WebSocket e organizado para uso com PlatformIO.
+Firmware do cofrinho para ESP32, baseado no comportamento do Cofre FIAP V2, comunicando-se com o backend por WebSocket. Organizado para PlatformIO.
 
 ## Estrutura
 
-- `src/main.cpp`: inicializacao do dispositivo e ciclo principal.
-- `src/settings.cpp`: configuracao Wi-Fi/backend e persistencia na flash.
-- `src/hardware.cpp`: servos, fita NeoPixel e efeitos visuais.
-- `src/websocket_service.cpp`: conexao, reconexao e roteamento WebSocket.
-- `src/command_handler.cpp`: validacao e execucao dos comandos recebidos.
-- `src/state.cpp`: estado compartilhado do cofrinho e das etapas.
-- `include/`: contratos publicos e constantes de hardware.
+- `src/main.cpp`: inicialização e loop principal.
+- `src/settings.cpp`: Wi-Fi/backend via portal WiFiManager + persistência na flash (`Preferences`).
+- `src/hardware.cpp`: servos, fita NeoPixel e efeitos (etapas, abertura/fechamento).
+- `src/websocket_service.cpp`: conexão/reconexão WebSocket e tradução de envelopes.
+- `src/command_handler.cpp`: validação e execução dos comandos (`abrir`, `fechar`, `luz`, `apagar`, `tranca_direita`, `tranca_esquerda`, `correta`, `erro`).
+- `src/state.cpp` + `include/state.h`: `DeviceConfig` (host, porta, token, id, ângulos, cor da equipe).
+- `include/config.h`: GPIOs, LEDs e defaults.
 
 ## Hardware
 
-| Componente | GPIO | Observacao |
+| Componente | GPIO | Observação |
 | --- | --- | --- |
-| Servo da tranca | 18 | Aberto em 30 graus e fechado em 90 graus. |
-| Servo da porta | 19 | Aberto em 0 grau; fechamento configuravel. |
-| Fita NeoPixel | 23 | 18 LEDs: 0-1 luz interna e 2-17 progresso. |
+| Servo da tranca | 18 | Aberto em 30° (`LOCK_OPEN_ANGLE`), fechado em 90° (`LOCK_CLOSED_ANGLE`). |
+| Servo da porta | 19 | Abertura `doorOpenAngle` (padrão 0°), fechamento `doorCloseAngle` (padrão 60°), configuráveis pelo gestor e salvos na flash. |
+| Fita NeoPixel | 23 | 18 LEDs: 0–1 luz interna (`luz` alterna) e 2–17 progresso das etapas. |
+| Botão BOOT | 0 | Segurar nos primeiros 3s (`WIFI_RESET_HOLD_MS`) apaga só rede/host/token/id e reabre o portal. |
 
-## Configuracao inicial
+LEDs de progresso: distribuídos proporcionalmente ao nº de etapas; cada etapa guarda a cor da última equipe que a acertou; o acerto final não sobrescreve tudo (restaura por etapa).
 
-Ao iniciar sem rede configurada, o ESP32 abre o portal Wi-Fi aberto
-`Cofrinho_Config`. Nele devem ser informados a rede Wi-Fi, o **Backend host/IP**,
-o **Device token** e o identificador do cofrinho. Essas configuracoes ficam salvas
-na flash do ESP32.
+## Configuração inicial (portal `Cofrinho_Config`)
 
-O host inicia vazio, o token inicia como `cofrinho-device-token` e o identificador
-inicia como `cofre01`. O backend usa a porta `3000` (`PORT=3000` no `.env`).
+Sem rede configurada, o ESP32 abre o portal Wi-Fi aberto `Cofrinho_Config` com campos separados:
 
-Para apagar a rede salva e reabrir o portal, mantenha o botao **BOOT** do ESP32
-(GPIO 0) pressionado durante os primeiros tres segundos da inicializacao. O
-reset preserva os ajustes mecanicos e visuais do cofrinho, apagando somente Wi-Fi,
-host do backend, token e identificador do dispositivo.
+- Rede Wi-Fi (SSID/senha)
+- **Backend host/IP** (só host, sem `:porta` — o firmware remove se digitado)
+- **Backend port** (padrão `3000`, salvo na flash)
+- **Device token** (global, igual ao `DEVICE_TOKEN` do `backend_cofrinho/.env`)
+- **Identificador do cofrinho** (`deviceId`: `cofre01`, `cofre02`, … — diferencia os cofres)
 
-O backend deve estar acessivel pela rede local: no portal informe o IP LAN da
-maquina que executa o backend, e nao `localhost` ou `127.0.0.1`. Em
-`backend_cofrinho/.env`, configure `DEVICE_TOKEN` com o mesmo valor informado no
-ESP32 e mantenha `PORT=3000` (ou atualize `BACKEND_PORT` em `include/config.h`).
+Defaults (`include/config.h`): host vazio, porta `3000`, token `cofrinho-device-token`, id `cofre01`.
+
+O backend deve estar acessível na LAN: informe o **IP LAN do PC** (nunca `localhost`). Confira `PORT=3000` no backend ou ajuste a porta no portal.
+
+## Compilar e gravar (PlatformIO)
+
+```powershell
+cd firmware_cofrinho
+pio run        # compilar
+pio run -t upload       # gravar no ESP32
+pio device monitor      # monitor serial 115200
+```
+
+Dependências (`platformio.ini`, `env:esp32dev`): ArduinoJson, WebSockets (links2004), WiFiManager (tzapu), Adafruit NeoPixel, ESP32Servo.
 
 ## Protocolo WebSocket
 
-O dispositivo conecta sem TLS a:
+Conexão sem TLS:
 
 ```text
 ws://<backend-host-ou-ip>:3000/ws/cofres?deviceId=<id>&token=<token>
 ```
 
-O backend aceita IDs de `cofre01` a `cofre50`. A conexao bem-sucedida recebe:
+Backend aceita `cofre01`…`cofre30` (limite atual de 30 equipes). Sucesso:
 
 ```json
 {"type":"connected","deviceId":"cofre01"}
 ```
 
-## Mensagens recebidas
-
-Comandos recebidos sao convertidos para o formato legado `{ "comando": command }`
-com os campos de `payload` no mesmo objeto:
+Comandos (convertidos para o formato legado `{ "comando": … }` com `payload` junto):
 
 ```json
 {"type":"command","command":"abrir","payload":{}}
 {"type":"command","command":"correta","payload":{"cor":{"R":0,"G":255,"B":0}}}
+{"type":"command","command":{"tentando":true,"etapa":1,"cor":{"R":255,"G":0,"B":0}}}
 ```
 
-Configuracoes recebidas usam `stages` como `num_senhas`; quando `reset` e `true`,
-as etapas visuais tambem sao reiniciadas:
+Config (`stages` vira `num_senhas`, 1–16; `reset: true` reinicia o visual):
 
 ```json
-{
-  "type": "config",
-  "config": {"ownerTeamId": "equipe01", "stages": 3, "reset": true}
-}
+{"type":"config","config":{"ownerTeamId":"equipe01","stages":3,"doorOpenAngle":0,"doorCloseAngle":60,"teamColor":{"R":255,"G":0,"B":0},"reset":true}}
 ```
 
-`num_senhas` aceita de 1 a 16, que corresponde ao numero de LEDs de progresso.
+## Retorno do cofre
 
-## Retorno do Cofre
-
-Depois de processar um comando ou configuracao, o ESP32 envia o status:
+Após comando/config, o ESP32 envia `status` (visível no detalhe do cofre no `/admin`):
 
 ```json
 {"type":"status","status":{"event":"command","result":"ok","detail":"abrir"}}
 {"type":"status","status":{"event":"command","result":"error","detail":"unknown_command"}}
 {"type":"status","status":{"event":"configuration","result":"ok","detail":"saved"}}
 ```
+
+Reconecta a cada `WEBSOCKET_RECONNECT_INTERVAL_MS` (5s) se cair. Sem `pio` no PATH, compile em máquina com PlatformIO instalado.
