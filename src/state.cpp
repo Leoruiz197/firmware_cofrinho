@@ -5,11 +5,7 @@ DeviceConfig deviceConfig = {
     DEFAULT_BACKEND_PORT,
     "cofrinho-device-token",
     "cofre01",
-<<<<<<< HEAD
-    DEFAULT_BACKEND_PORT,
-=======
     DOOR_OPEN_ANGLE,
->>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
     60,
     1,
     {255, 255, 255},
