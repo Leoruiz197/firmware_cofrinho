@@ -9,6 +9,16 @@ Servo lockServo;
 Servo doorServo;
 Adafruit_NeoPixel leds(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+constexpr unsigned long STAGE_LED_ANIMATION_MS = 200;
+
+// Último LED (offset dentro da faixa de progresso, 0-based) da etapa informada,
+// usando a mesma divisão do restoreStageLeds: etapa = (índice * senhas) / LEDs.
+uint8_t stageLedEndOffset(uint8_t stage) {
+  const uint8_t progressLeds = PROGRESS_LED_END - PROGRESS_LED_START + 1;
+  const uint16_t numerator = static_cast<uint16_t>(stage) * progressLeds + deviceConfig.passwordCount - 1;
+  return static_cast<uint8_t>(numerator / deviceConfig.passwordCount) - 1;
+}
+
 void moveServoSmoothly(Servo& servo, int& currentPosition, int targetPosition, uint8_t stepDelayMs) {
   targetPosition = constrain(targetPosition, 0, 180);
   const int step = currentPosition <= targetPosition ? 1 : -1;
@@ -112,9 +122,20 @@ void showCorrectStage(uint8_t stage, RgbColor color) {
   if (stage == 0 || stage > deviceConfig.passwordCount) {
     return;
   }
-  stageColors[stage - 1] = color;
+  // Toda a parte resolvida assume a cor da última equipe que acertou.
+  for (uint8_t solved = 0; solved < stage; ++solved) {
+    stageColors[solved] = color;
+  }
   if (stage > currentStage) {
     currentStage = stage;
+  }
+
+  // Acende do primeiro LED até o último LED da etapa, 1 por vez, a cada 200ms.
+  const uint8_t endOffset = stageLedEndOffset(stage);
+  for (uint8_t offset = 0; offset <= endOffset; ++offset) {
+    leds.setPixelColor(PROGRESS_LED_START + offset, leds.Color(color.red, color.green, color.blue));
+    leds.show();
+    delay(STAGE_LED_ANIMATION_MS);
   }
   restoreStageLeds();
 }
