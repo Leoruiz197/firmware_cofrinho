@@ -1,4 +1,5 @@
 #include <ArduinoJson.h>
+#include <WiFi.h>
 #include <WebSocketsClient.h>
 
 #include "command_handler.h"
@@ -18,25 +19,6 @@ String payloadToString(const uint8_t* payload, size_t length) {
   return message;
 }
 
-String urlEncode(const char* value) {
-  const char hex[] = "0123456789ABCDEF";
-  String encoded;
-  while (*value) {
-    const uint8_t character = static_cast<uint8_t>(*value++);
-    if ((character >= 'a' && character <= 'z') ||
-        (character >= 'A' && character <= 'Z') ||
-        (character >= '0' && character <= '9') ||
-        character == '-' || character == '_' || character == '.' || character == '~') {
-      encoded += static_cast<char>(character);
-    } else {
-      encoded += '%';
-      encoded += hex[character >> 4];
-      encoded += hex[character & 0x0F];
-    }
-  }
-  return encoded;
-}
-
 void handleWebSocketMessage(const String& message) {
   Serial.printf("[WS] Mensagem recebida: %s\n", message.c_str());
 
@@ -49,6 +31,22 @@ void handleWebSocketMessage(const String& message) {
 
   const char* type = document["type"] | "";
   if (strcmp(type, "command") == 0) {
+    if (document["command"].is<JsonObjectConst>()) {
+      JsonDocument commandDocument;
+      commandDocument["comando"] = document["command"];
+      if (document["payload"].is<JsonObjectConst>()) {
+        for (JsonPairConst field : document["payload"].as<JsonObjectConst>()) {
+          if (commandDocument["comando"][field.key()].isNull()) {
+            commandDocument["comando"][field.key()] = field.value();
+          }
+        }
+      }
+      String commandPayload;
+      serializeJson(commandDocument, commandPayload);
+      handleCommand(commandPayload);
+      return;
+    }
+
     if (!document["command"].is<const char*>() || !document["payload"].is<JsonObjectConst>()) {
       Serial.println("[WS] Erro ao processar comando: envelope invalido.");
       publishStatus("command", "error", "invalid_envelope");
@@ -76,6 +74,9 @@ void handleWebSocketMessage(const String& message) {
 
     JsonDocument configurationDocument;
     configurationDocument["num_senhas"] = config["stages"];
+    if (config["teamColor"].is<JsonObjectConst>()) {
+      configurationDocument["cor_equipe"]["cor"] = config["teamColor"];
+    }
     String configurationPayload;
     serializeJson(configurationDocument, configurationPayload);
     handleConfiguration(configurationPayload);
@@ -93,11 +94,11 @@ void handleWebSocketMessage(const String& message) {
 void onWebSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
-      Serial.printf("[WS] Conectado a ws://%s:%u/ws/cofres\n", deviceConfig.backendHost, BACKEND_PORT);
+      Serial.printf("[WS] Conectado a %s://%s:%u/ws/cofres\n", deviceConfig.backendPort == 443 ? "wss" : "ws", deviceConfig.backendHost, deviceConfig.backendPort);
       publishStatus("connection", "connected");
       break;
     case WStype_DISCONNECTED:
-      Serial.println("[WS] Desconectado. Reconexao automatica aguardando.");
+      Serial.printf("[WS] Desconectado: %s. Reconexao automatica aguardando.\n", payloadToString(payload, length).c_str());
       break;
     case WStype_TEXT:
       handleWebSocketMessage(payloadToString(payload, length));
@@ -138,12 +139,22 @@ void initializeWebSocket() {
     return;
   }
 
-  const String path = "/ws/cofres?deviceId=" + urlEncode(deviceConfig.deviceId) +
-      "&token=" + urlEncode(deviceConfig.deviceToken);
-  Serial.printf("[WS] Conectando a ws://%s:%u%s\n", deviceConfig.backendHost, BACKEND_PORT, path.c_str());
-  webSocket.begin(deviceConfig.backendHost, BACKEND_PORT, path.c_str());
+  String instanceId = WiFi.macAddress();
+  instanceId.replace(":", "");
+  const String path = "/ws/cofres/" + String(deviceConfig.deviceId) + "/" + instanceId;
+  Serial.printf("[WS] Conectando a %s://%s:%u%s\n", deviceConfig.backendPort == 443 ? "wss" : "ws", deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
+  if (deviceConfig.backendPort == 443) {
+    webSocket.beginSSL(deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
+  } else {
+    webSocket.begin(deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
+  }
+  // begin() limpa a autorizacao. Configurar depois, sem CRLF: a biblioteca
+  // adiciona o cabecalho e as quebras HTTP na ordem correta.
+  const String authorization = "Bearer " + String(deviceConfig.deviceToken);
+  webSocket.setAuthorization(authorization.c_str());
   webSocket.onEvent(onWebSocketEvent);
   webSocket.setReconnectInterval(WEBSOCKET_RECONNECT_INTERVAL_MS);
+  webSocket.enableHeartbeat(30000, 5000, 2);
 }
 
 void runWebSocket() {

@@ -28,8 +28,10 @@ Ao iniciar sem rede configurada, o ESP32 abre o portal Wi-Fi aberto
 o **Device token** e o identificador do cofrinho. Essas configuracoes ficam salvas
 na flash do ESP32.
 
-O host inicia vazio, o token inicia como `cofrinho-device-token` e o identificador
-inicia como `cofre01`. O backend usa a porta `3000` (`PORT=3000` no `.env`).
+O host inicia preenchido como `https://backend-cofrinho.onrender.com`, o token
+inicia como `cofrinho-device-token` e o identificador inicia como `cofre01`.
+Para o Render, use a porta `443`; o firmware remove o `https://`
+automaticamente antes de abrir a conexao e usa TLS nessa porta.
 
 Para apagar a rede salva e reabrir o portal, mantenha o botao **BOOT** do ESP32
 (GPIO 0) pressionado durante os primeiros tres segundos da inicializacao. O
@@ -39,21 +41,37 @@ host do backend, token e identificador do dispositivo.
 O backend deve estar acessivel pela rede local: no portal informe o IP LAN da
 maquina que executa o backend, e nao `localhost` ou `127.0.0.1`. Em
 `backend_cofrinho/.env`, configure `DEVICE_TOKEN` com o mesmo valor informado no
-ESP32 e mantenha `PORT=3000` (ou atualize `BACKEND_PORT` em `include/config.h`).
+ESP32.
 
 ## Protocolo WebSocket
 
-O dispositivo conecta sem TLS a:
+O dispositivo conecta por WebSocket. Localmente use `ws` na porta `3000`; no
+Render use `wss` na porta `443`:
 
 ```text
-ws://<backend-host-ou-ip>:3000/ws/cofres?deviceId=<id>&token=<token>
+ws://<backend-host-ou-ip>:3000/ws/cofres/<id>/<mac-sem-dois-pontos>
 ```
 
-O backend aceita IDs de `cofre01` a `cofre50`. A conexao bem-sucedida recebe:
+Para o Render, os campos do portal devem ficar assim:
+
+```text
+Backend host/IP: https://backend-cofrinho.onrender.com
+Porta backend: 443
+```
+
+O backend aceita IDs de `cofre01` a `cofre30`. A conexao bem-sucedida recebe:
 
 ```json
 {"type":"connected","deviceId":"cofre01"}
 ```
+
+O token nao e enviado pela URL. O firmware o inclui no handshake WebSocket como
+`Authorization: Bearer <device-token>`. Com TLS ativado, esse cabecalho e
+protegido em transito.
+
+O firmware inclui o MAC do ESP32 no caminho WebSocket, sem os dois-pontos. O
+backend mantem somente uma conexao por cofre e rejeita outro ESP32 que tente
+usar o mesmo identificador, em vez de derrubar o dispositivo ja conectado.
 
 ## Mensagens recebidas
 

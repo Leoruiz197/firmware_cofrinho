@@ -13,6 +13,7 @@ struct DeviceConfig {
   char backendHost[64];
   char deviceToken[96];
   char deviceId[32];
+  uint16_t backendPort;
   int doorCloseAngle;
   uint8_t passwordCount;
   RgbColor teamColor;

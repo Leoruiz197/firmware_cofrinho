@@ -4,6 +4,7 @@ DeviceConfig deviceConfig = {
     "",
     "cofrinho-device-token",
     "cofre01",
+    DEFAULT_BACKEND_PORT,
     60,
     1,
     {255, 255, 255},

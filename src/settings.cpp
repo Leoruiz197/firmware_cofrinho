@@ -1,4 +1,5 @@
 #include <Preferences.h>
+#include <WiFi.h>
 #include <WiFiManager.h>
 
 #include "config.h"
@@ -10,6 +11,15 @@ Preferences preferences;
 
 int readColor(const char* key, int fallback) {
   return constrain(preferences.getInt(key, fallback), 0, 255);
+}
+
+String normalizeBackendHost(String host) {
+  host.trim();
+  if (host.startsWith("https://")) host.remove(0, 8);
+  if (host.startsWith("http://")) host.remove(0, 7);
+  const int pathStart = host.indexOf('/');
+  if (pathStart >= 0) host.remove(pathStart);
+  return host;
 }
 }
 
@@ -23,6 +33,7 @@ void loadSettings() {
   backendHost.toCharArray(deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
   deviceToken.toCharArray(deviceConfig.deviceToken, sizeof(deviceConfig.deviceToken));
   deviceId.toCharArray(deviceConfig.deviceId, sizeof(deviceConfig.deviceId));
+  deviceConfig.backendPort = constrain(preferences.getUInt("backendPort", DEFAULT_BACKEND_PORT), 1, 65535);
   deviceConfig.doorCloseAngle = constrain(preferences.getInt("doorClose", 60), 0, 180);
   deviceConfig.passwordCount = constrain(preferences.getUInt("passwords", 1), 1, MAX_STAGES);
   deviceConfig.teamColor = {
@@ -41,6 +52,7 @@ void saveSettings() {
   preferences.putString("backendHost", deviceConfig.backendHost);
   preferences.putString("deviceToken", deviceConfig.deviceToken);
   preferences.putString("deviceId", deviceConfig.deviceId);
+  preferences.putUInt("backendPort", deviceConfig.backendPort);
   preferences.putInt("doorClose", deviceConfig.doorCloseAngle);
   preferences.putUInt("passwords", deviceConfig.passwordCount);
   preferences.putInt("colorR", deviceConfig.teamColor.red);
@@ -51,14 +63,22 @@ void saveSettings() {
 
 void configureWifi() {
   WiFiManager wifiManager;
+  char backendPort[6];
+  snprintf(backendPort, sizeof(backendPort), "%u", deviceConfig.backendPort);
   WiFiManagerParameter backendHostParameter("backendHost", "Backend host/IP", deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
+  WiFiManagerParameter backendPortParameter("backendPort", "Porta backend", backendPort, sizeof(backendPort));
   WiFiManagerParameter deviceTokenParameter("deviceToken", "Device token", deviceConfig.deviceToken, sizeof(deviceConfig.deviceToken));
   WiFiManagerParameter deviceParameter("deviceId", "Identificador do cofrinho", deviceConfig.deviceId, sizeof(deviceConfig.deviceId));
 
   wifiManager.addParameter(&backendHostParameter);
+  wifiManager.addParameter(&backendPortParameter);
   wifiManager.addParameter(&deviceTokenParameter);
   wifiManager.addParameter(&deviceParameter);
   wifiManager.setConfigPortalTimeout(180);
+
+  // Mantem DHCP para IP/gateway e substitui DNS instavel de alguns hotspots.
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8));
+  Serial.println("[WiFi] DNS configurado: 1.1.1.1 e 8.8.8.8");
 
   pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
   bool forceConfigPortal = false;
@@ -75,11 +95,13 @@ void configureWifi() {
         // Mantem os ajustes mecanicos do cofrinho e limpa somente a conectividade.
         preferences.begin("cofrinho", false);
         preferences.remove("backendHost");
+        preferences.remove("backendPort");
         preferences.remove("deviceToken");
         preferences.remove("deviceId");
         preferences.end();
 
         strlcpy(deviceConfig.backendHost, DEFAULT_BACKEND_HOST, sizeof(deviceConfig.backendHost));
+        deviceConfig.backendPort = DEFAULT_BACKEND_PORT;
         strlcpy(deviceConfig.deviceToken, DEFAULT_DEVICE_TOKEN, sizeof(deviceConfig.deviceToken));
         strlcpy(deviceConfig.deviceId, DEFAULT_DEVICE_ID, sizeof(deviceConfig.deviceId));
         forceConfigPortal = true;
@@ -99,7 +121,19 @@ void configureWifi() {
     ESP.restart();
   }
 
-  strlcpy(deviceConfig.backendHost, backendHostParameter.getValue(), sizeof(deviceConfig.backendHost));
+  // WiFiManager/DHCP pode substituir o DNS definido antes da conexao.
+  if (!WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8))) {
+    Serial.println("[WiFi] Nao foi possivel reaplicar o DNS publico.");
+  }
+  const unsigned long dnsStart = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - dnsStart < 5000) {
+    delay(50);
+  }
+  Serial.printf("[WiFi] DNS ativo: %s e %s\n", WiFi.dnsIP(0).toString().c_str(), WiFi.dnsIP(1).toString().c_str());
+
+  const String host = normalizeBackendHost(backendHostParameter.getValue());
+  host.toCharArray(deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
+  deviceConfig.backendPort = constrain(String(backendPortParameter.getValue()).toInt(), 1, 65535);
   strlcpy(deviceConfig.deviceToken, deviceTokenParameter.getValue(), sizeof(deviceConfig.deviceToken));
   strlcpy(deviceConfig.deviceId, deviceParameter.getValue(), sizeof(deviceConfig.deviceId));
   saveSettings();

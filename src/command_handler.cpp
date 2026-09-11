@@ -45,6 +45,7 @@ void handleCommand(const String& payload) {
     else if (action == "tranca_direita") openLock();
     else if (action == "tranca_esquerda") closeLock();
     else if (action == "correta") showCorrectAttempt(readColor(document["cor"], deviceConfig.teamColor));
+    else if (action == "erro") showIncorrectAttempt();
     else {
       Serial.printf("[WS] Erro ao processar comando: comando desconhecido (%s).\n", action.c_str());
       publishStatus("command", "error", "unknown_command");
@@ -91,10 +92,10 @@ void handleConfiguration(const String& payload) {
   if (!document["cor_equipe"].isNull()) {
     deviceConfig.teamColor = readColor(document["cor_equipe"]["cor"], deviceConfig.teamColor);
     resetStages();
-    applyTeamColor();
     changed = true;
   }
   if (changed) {
+    applyTeamColor();
     saveSettings();
     publishStatus("configuration", "ok", "saved");
   } else {
