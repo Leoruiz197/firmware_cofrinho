@@ -31,6 +31,7 @@ void handleWebSocketMessage(const String& message) {
 
   const char* type = document["type"] | "";
   if (strcmp(type, "command") == 0) {
+<<<<<<< HEAD
     if (document["command"].is<JsonObjectConst>()) {
       JsonDocument commandDocument;
       commandDocument["comando"] = document["command"];
@@ -48,6 +49,9 @@ void handleWebSocketMessage(const String& message) {
     }
 
     if (!document["command"].is<const char*>() || !document["payload"].is<JsonObjectConst>()) {
+=======
+    if (document["command"].isNull() || !document["payload"].is<JsonObjectConst>()) {
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
       Serial.println("[WS] Erro ao processar comando: envelope invalido.");
       publishStatus("command", "error", "invalid_envelope");
       return;
@@ -57,7 +61,7 @@ void handleWebSocketMessage(const String& message) {
     for (JsonPairConst field : document["payload"].as<JsonObjectConst>()) {
       commandDocument[field.key()] = field.value();
     }
-    commandDocument["comando"] = document["command"];
+    commandDocument["comando"].set(document["command"]);
     String commandPayload;
     serializeJson(commandDocument, commandPayload);
     handleCommand(commandPayload);
@@ -74,8 +78,23 @@ void handleWebSocketMessage(const String& message) {
 
     JsonDocument configurationDocument;
     configurationDocument["num_senhas"] = config["stages"];
+<<<<<<< HEAD
     if (config["teamColor"].is<JsonObjectConst>()) {
       configurationDocument["cor_equipe"]["cor"] = config["teamColor"];
+=======
+    if (config["doorOpenAngle"].is<int>()) {
+      configurationDocument["angulo-min"] = config["doorOpenAngle"];
+    }
+    if (config["doorCloseAngle"].is<int>()) {
+      configurationDocument["angulo-max"] = config["doorCloseAngle"];
+    }
+    if (config["teamColor"].is<JsonObjectConst>()) {
+      JsonObject color = configurationDocument["cor_equipe"]["cor"].to<JsonObject>();
+      JsonObjectConst teamColor = config["teamColor"].as<JsonObjectConst>();
+      color["R"] = teamColor["R"] | 255;
+      color["G"] = teamColor["G"] | 255;
+      color["B"] = teamColor["B"] | 255;
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
     }
     String configurationPayload;
     serializeJson(configurationDocument, configurationPayload);
@@ -94,7 +113,11 @@ void handleWebSocketMessage(const String& message) {
 void onWebSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
+<<<<<<< HEAD
       Serial.printf("[WS] Conectado a %s://%s:%u/ws/cofres\n", deviceConfig.backendPort == 443 ? "wss" : "ws", deviceConfig.backendHost, deviceConfig.backendPort);
+=======
+      Serial.printf("[WS] Conectado a ws://%s:%u/ws/cofres\n", deviceConfig.backendHost, deviceConfig.backendPort);
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
       publishStatus("connection", "connected");
       break;
     case WStype_DISCONNECTED:
@@ -139,6 +162,7 @@ void initializeWebSocket() {
     return;
   }
 
+<<<<<<< HEAD
   String instanceId = WiFi.macAddress();
   instanceId.replace(":", "");
   const String path = "/ws/cofres/" + String(deviceConfig.deviceId) + "/" + instanceId;
@@ -152,6 +176,12 @@ void initializeWebSocket() {
   // adiciona o cabecalho e as quebras HTTP na ordem correta.
   const String authorization = "Bearer " + String(deviceConfig.deviceToken);
   webSocket.setAuthorization(authorization.c_str());
+=======
+  const String path = "/ws/cofres?deviceId=" + urlEncode(deviceConfig.deviceId) +
+      "&token=" + urlEncode(deviceConfig.deviceToken);
+  Serial.printf("[WS] Conectando a ws://%s:%u%s\n", deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
+  webSocket.begin(deviceConfig.backendHost, deviceConfig.backendPort, path.c_str());
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
   webSocket.onEvent(onWebSocketEvent);
   webSocket.setReconnectInterval(WEBSOCKET_RECONNECT_INTERVAL_MS);
   webSocket.enableHeartbeat(30000, 5000, 2);

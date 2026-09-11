@@ -7,6 +7,8 @@
 #include "state.h"
 
 namespace {
+bool internalLightEnabled = false;
+
 RgbColor readColor(JsonVariantConst value, RgbColor fallback) {
   if (!value.is<JsonObjectConst>()) {
     return fallback;
@@ -40,8 +42,15 @@ void handleCommand(const String& payload) {
     action.toLowerCase();
     if (action == "abrir") openDoor();
     else if (action == "fechar") closeDoor();
-    else if (action == "luz") turnInternalLightOn();
-    else if (action == "apagar") turnAllLedsOff();
+    else if (action == "luz") {
+      internalLightEnabled = !internalLightEnabled;
+      if (internalLightEnabled) turnInternalLightOn();
+      else turnInternalLightOff();
+    }
+    else if (action == "apagar") {
+      internalLightEnabled = false;
+      turnAllLedsOff();
+    }
     else if (action == "tranca_direita") openLock();
     else if (action == "tranca_esquerda") closeLock();
     else if (action == "correta") showCorrectAttempt(readColor(document["cor"], deviceConfig.teamColor));
@@ -80,6 +89,10 @@ void handleConfiguration(const String& payload) {
   }
 
   bool changed = false;
+  if (!document["angulo-min"].isNull()) {
+    deviceConfig.doorOpenAngle = constrain(document["angulo-min"].as<int>(), 0, 180);
+    changed = true;
+  }
   if (!document["angulo-max"].isNull()) {
     deviceConfig.doorCloseAngle = constrain(document["angulo-max"].as<int>(), 0, 180);
     changed = true;

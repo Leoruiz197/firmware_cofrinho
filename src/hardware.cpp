@@ -71,13 +71,9 @@ void turnAllLedsOff() {
 
 void restoreStageLeds() {
   const uint8_t progressLeds = PROGRESS_LED_END - PROGRESS_LED_START + 1;
-  const uint8_t ledsPerStage = progressLeds / deviceConfig.passwordCount;
 
   for (uint8_t index = 0; index < progressLeds; ++index) {
-    uint8_t stage = index / ledsPerStage;
-    if (stage >= deviceConfig.passwordCount) {
-      stage = deviceConfig.passwordCount - 1;
-    }
+    const uint8_t stage = (index * deviceConfig.passwordCount) / progressLeds;
     const RgbColor color = stage < currentStage ? stageColors[stage] : deviceConfig.teamColor;
     leds.setPixelColor(PROGRESS_LED_START + index, leds.Color(color.red, color.green, color.blue));
   }
@@ -94,7 +90,7 @@ void showCorrectAttempt(RgbColor color) {
   openLock();
   turnInternalLightOn();
   openDoor();
-  setProgressColor(color);
+  restoreStageLeds();
 }
 
 void showCorrectStage(uint8_t stage, RgbColor color) {
@@ -120,7 +116,7 @@ void showIncorrectAttempt() {
   restoreStageLeds();
 }
 
-void openDoor() { moveServoSmoothly(doorServo, doorServoPosition, DOOR_OPEN_ANGLE, 10); }
+void openDoor() { moveServoSmoothly(doorServo, doorServoPosition, deviceConfig.doorOpenAngle, 10); }
 void closeDoor() { moveServoSmoothly(doorServo, doorServoPosition, deviceConfig.doorCloseAngle, 10); }
 void openLock() { moveServoSmoothly(lockServo, lockServoPosition, LOCK_OPEN_ANGLE, 3); }
 void closeLock() { moveServoSmoothly(lockServo, lockServoPosition, LOCK_CLOSED_ANGLE, 3); }

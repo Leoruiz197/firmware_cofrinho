@@ -8,6 +8,7 @@
 
 namespace {
 Preferences preferences;
+char backendPortValue[6];
 
 int readColor(const char* key, int fallback) {
   return constrain(preferences.getInt(key, fallback), 0, 255);
@@ -26,6 +27,7 @@ String normalizeBackendHost(String host) {
 void loadSettings() {
   preferences.begin("cofrinho", true);
   String backendHost = preferences.getString("backendHost", DEFAULT_BACKEND_HOST);
+  deviceConfig.backendPort = constrain(preferences.getUInt("backendPort", DEFAULT_BACKEND_PORT), 1, 65535);
   String deviceToken = preferences.getString("deviceToken", DEFAULT_DEVICE_TOKEN);
   String deviceId = preferences.getString("deviceId", DEFAULT_DEVICE_ID);
   if (deviceToken.isEmpty()) deviceToken = DEFAULT_DEVICE_TOKEN;
@@ -33,7 +35,11 @@ void loadSettings() {
   backendHost.toCharArray(deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
   deviceToken.toCharArray(deviceConfig.deviceToken, sizeof(deviceConfig.deviceToken));
   deviceId.toCharArray(deviceConfig.deviceId, sizeof(deviceConfig.deviceId));
+<<<<<<< HEAD
   deviceConfig.backendPort = constrain(preferences.getUInt("backendPort", DEFAULT_BACKEND_PORT), 1, 65535);
+=======
+  deviceConfig.doorOpenAngle = constrain(preferences.getInt("doorOpen", DOOR_OPEN_ANGLE), 0, 180);
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
   deviceConfig.doorCloseAngle = constrain(preferences.getInt("doorClose", 60), 0, 180);
   deviceConfig.passwordCount = constrain(preferences.getUInt("passwords", 1), 1, MAX_STAGES);
   deviceConfig.teamColor = {
@@ -50,9 +56,14 @@ void loadSettings() {
 void saveSettings() {
   preferences.begin("cofrinho", false);
   preferences.putString("backendHost", deviceConfig.backendHost);
+  preferences.putUInt("backendPort", deviceConfig.backendPort);
   preferences.putString("deviceToken", deviceConfig.deviceToken);
   preferences.putString("deviceId", deviceConfig.deviceId);
+<<<<<<< HEAD
   preferences.putUInt("backendPort", deviceConfig.backendPort);
+=======
+  preferences.putInt("doorOpen", deviceConfig.doorOpenAngle);
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
   preferences.putInt("doorClose", deviceConfig.doorCloseAngle);
   preferences.putUInt("passwords", deviceConfig.passwordCount);
   preferences.putInt("colorR", deviceConfig.teamColor.red);
@@ -63,10 +74,16 @@ void saveSettings() {
 
 void configureWifi() {
   WiFiManager wifiManager;
+<<<<<<< HEAD
   char backendPort[6];
   snprintf(backendPort, sizeof(backendPort), "%u", deviceConfig.backendPort);
   WiFiManagerParameter backendHostParameter("backendHost", "Backend host/IP", deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
   WiFiManagerParameter backendPortParameter("backendPort", "Porta backend", backendPort, sizeof(backendPort));
+=======
+  snprintf(backendPortValue, sizeof(backendPortValue), "%u", deviceConfig.backendPort);
+  WiFiManagerParameter backendHostParameter("backendHost", "Backend host/IP", deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
+  WiFiManagerParameter backendPortParameter("backendPort", "Backend port", backendPortValue, sizeof(backendPortValue));
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
   WiFiManagerParameter deviceTokenParameter("deviceToken", "Device token", deviceConfig.deviceToken, sizeof(deviceConfig.deviceToken));
   WiFiManagerParameter deviceParameter("deviceId", "Identificador do cofrinho", deviceConfig.deviceId, sizeof(deviceConfig.deviceId));
 
@@ -121,6 +138,7 @@ void configureWifi() {
     ESP.restart();
   }
 
+<<<<<<< HEAD
   // WiFiManager/DHCP pode substituir o DNS definido antes da conexao.
   if (!WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8))) {
     Serial.println("[WiFi] Nao foi possivel reaplicar o DNS publico.");
@@ -134,6 +152,14 @@ void configureWifi() {
   const String host = normalizeBackendHost(backendHostParameter.getValue());
   host.toCharArray(deviceConfig.backendHost, sizeof(deviceConfig.backendHost));
   deviceConfig.backendPort = constrain(String(backendPortParameter.getValue()).toInt(), 1, 65535);
+=======
+  strlcpy(deviceConfig.backendHost, backendHostParameter.getValue(), sizeof(deviceConfig.backendHost));
+  char* portSeparator = strchr(deviceConfig.backendHost, ':');
+  if (portSeparator != nullptr) {
+    *portSeparator = '\0';
+  }
+  deviceConfig.backendPort = constrain(atoi(backendPortParameter.getValue()), 1, 65535);
+>>>>>>> 0061d9280d5d7fc53cc2d63004cb959bdc004a27
   strlcpy(deviceConfig.deviceToken, deviceTokenParameter.getValue(), sizeof(deviceConfig.deviceToken));
   strlcpy(deviceConfig.deviceId, deviceParameter.getValue(), sizeof(deviceConfig.deviceId));
   saveSettings();
