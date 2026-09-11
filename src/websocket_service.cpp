@@ -130,6 +130,7 @@ void publishStatus(const char* event, const char* result, const String& detail) 
   document["type"] = "status";
   status["event"] = event;
   status["result"] = result;
+  status["firmwareVersion"] = FIRMWARE_VERSION;
   if (detail.length() > 0) {
     status["detail"] = detail;
   }
@@ -138,6 +139,28 @@ void publishStatus(const char* event, const char* result, const String& detail) 
   serializeJson(document, payload);
   if (!webSocket.sendTXT(payload)) {
     Serial.println("[WS] Erro ao enviar status.");
+  }
+}
+
+void publishOtaStatus(const char* status, int progress, const String& targetVersion, const String& message) {
+  if (!webSocket.isConnected()) {
+    return;
+  }
+
+  JsonDocument document;
+  JsonObject statusObj = document["status"].to<JsonObject>();
+  document["type"] = "status";
+  statusObj["event"] = "ota";
+  statusObj["result"] = status;
+  statusObj["progress"] = constrain(progress, 0, 100);
+  statusObj["targetVersion"] = targetVersion;
+  statusObj["firmwareVersion"] = FIRMWARE_VERSION;
+  statusObj["detail"] = message;
+
+  String payload;
+  serializeJson(document, payload);
+  if (!webSocket.sendTXT(payload)) {
+    Serial.println("[WS] Erro ao enviar status OTA.");
   }
 }
 

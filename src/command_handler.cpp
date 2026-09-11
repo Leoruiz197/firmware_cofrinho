@@ -5,6 +5,7 @@
 #include "websocket_service.h"
 #include "settings.h"
 #include "state.h"
+#include "ota.h"
 
 namespace {
 bool internalLightEnabled = false;
@@ -55,6 +56,20 @@ void handleCommand(const String& payload) {
     else if (action == "tranca_esquerda") closeLock();
     else if (action == "correta") showCorrectAttempt(readColor(document["cor"], deviceConfig.teamColor));
     else if (action == "erro") showIncorrectAttempt();
+    else if (action == "firmware_update") {
+      const String manifestUrl = document["manifestUrl"] | "";
+      const String targetVersion = document["targetVersion"] | "";
+      const uint64_t serverTime = document["serverTime"].as<uint64_t>();
+      if (manifestUrl.length() == 0) {
+        Serial.println("[OTA] Comando sem manifestUrl.");
+        publishStatus("command", "error", "missing_manifest_url");
+        return;
+      }
+      Serial.printf("[OTA] Comando recebido: %s -> %s\n", targetVersion.c_str(), manifestUrl.c_str());
+      publishStatus("command", "ok", action);
+      startOtaUpdate(manifestUrl, serverTime, targetVersion);
+      return;
+    }
     else {
       Serial.printf("[WS] Erro ao processar comando: comando desconhecido (%s).\n", action.c_str());
       publishStatus("command", "error", "unknown_command");

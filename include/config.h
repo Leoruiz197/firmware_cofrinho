@@ -1,5 +1,11 @@
 #pragma once
 
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "1.0.0"
+#endif
+
+#define FIRMWARE_BUILD_MARKER "COFRINHO_FW_VERSION=" FIRMWARE_VERSION
+
 constexpr bool DEBUG_ENABLED = true;
 
 constexpr uint8_t LOCK_SERVO_PIN = 18;

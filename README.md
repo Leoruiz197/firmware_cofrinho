@@ -8,7 +8,8 @@ Firmware do cofrinho para ESP32, baseado no comportamento do Cofre FIAP V2, comu
 - `src/settings.cpp`: Wi-Fi/backend via portal WiFiManager + persistência na flash (`Preferences`).
 - `src/hardware.cpp`: servos, fita NeoPixel e efeitos (etapas, abertura/fechamento).
 - `src/websocket_service.cpp`: conexão/reconexão WebSocket, heartbeat e tradução de envelopes.
-- `src/command_handler.cpp`: validação e execução dos comandos (`abrir`, `fechar`, `luz`, `apagar`, `tranca_direita`, `tranca_esquerda`, `correta`, `erro`, objeto `{tentando, etapa, cor}`).
+- `src/command_handler.cpp`: validação e execução dos comandos (`abrir`, `fechar`, `luz`, `apagar`, `tranca_direita`, `tranca_esquerda`, `correta`, `erro`, objeto `{tentando, etapa, cor}`, `firmware_update`).
+- `src/ota.cpp` + `include/ota.h`: atualização OTA via manifesto (mesmo fluxo do Cofre FIAP V2).
 - `src/state.cpp` + `include/state.h`: `DeviceConfig` (host, porta, token, id, ângulos, cor da equipe).
 - `include/config.h`: GPIOs, LEDs e defaults.
 
@@ -95,6 +96,33 @@ Após comando/config, o ESP32 envia `status` (visível no detalhe do cofre no `/
 {"type":"status","status":{"event":"command","result":"ok","detail":"abrir"}}
 {"type":"status","status":{"event":"command","result":"error","detail":"unknown_command"}}
 {"type":"status","status":{"event":"configuration","result":"ok","detail":"saved"}}
+```
+
+## OTA (over-the-air)
+
+Mesmo fluxo do Cofre FIAP V2, adaptado ao loop único do cofrinho (atualização
+síncrona — o loop fica bloqueado durante o download):
+
+1. O admin dispara no backend, que envia ao cofre:
+```json
+{"type":"command","command":"firmware_update","payload":{"manifestUrl":"https://.../api/firmware/manifest/1.1.0","targetVersion":"1.1.0","serverTime":1730000000000}}
+```
+2. O cofre baixa o manifesto `{version, downloadUrl, sha256, size}` com
+   `X-Device-Token`, exige HTTPS (exceto LAN) e sincroniza o relógio via NTP.
+3. Baixa o `.bin`, grava via `Update`, verifica o SHA-256 e reinicia.
+4. LEDs: laranja durante o download, 3 piscadas verdes no sucesso (vermelhas
+   em erro) e restaura as etapas. Progresso a cada 5%:
+```json
+{"type":"status","status":{"event":"ota","result":"downloading","progress":45,"targetVersion":"1.1.0","firmwareVersion":"1.0.0","detail":"Baixando e gravando firmware"}}
+```
+5. Versão atual em `FIRMWARE_VERSION` (`platformio.ini`, padrão `1.0.0`) e em
+   todo `status` (`firmwareVersion`), visível no detalhe do cofre no `/admin`.
+6. Requer partições OTA (`partitions_ota.csv`: `app0`/`app1` de ~1,9 MB) —
+   **regrave com upload serial ao trocar o particionamento pela primeira vez**.
+
+```text
+[OTA] Iniciando atualização
+[OTA] Firmware validado; reiniciando
 ```
 
 ## Serial Monitor (115200)

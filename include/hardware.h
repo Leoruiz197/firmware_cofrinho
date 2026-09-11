@@ -9,6 +9,8 @@ void turnInternalLightOff();
 void turnProgressGreen();
 void turnProgressRed();
 void turnProgressOff();
+void otaLedProgress();
+void otaLedResult(bool ok);
 void turnAllLedsOff();
 void restoreStageLeds();
 void showCorrectAttempt(RgbColor color);

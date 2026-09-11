@@ -64,6 +64,21 @@ void turnProgressGreen() { setProgressColor({0, 255, 0}); }
 void turnProgressRed() { setProgressColor({255, 0, 0}); }
 void turnProgressOff() { setProgressColor({0, 0, 0}); }
 
+// Sinalização OTA (mesmo padrão do Cofre FIAP V2): laranja durante o
+// download, 3 piscadas verde/vermelho no resultado e restaura as etapas.
+void otaLedProgress() { setProgressColor({255, 165, 0}); }
+
+void otaLedResult(bool ok) {
+  const RgbColor color = ok ? RgbColor{0, 255, 0} : RgbColor{255, 0, 0};
+  for (uint8_t attempt = 0; attempt < 3; ++attempt) {
+    setProgressColor(color);
+    delay(300);
+    restoreStageLeds();
+    delay(300);
+  }
+  restoreStageLeds();
+}
+
 void turnAllLedsOff() {
   leds.clear();
   leds.show();
